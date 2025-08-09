@@ -273,21 +273,45 @@ jobs:
           # Clone Testing repository
           git clone https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/dartinbot-framework-testing.git testing-repo
           
-          # Copy templates and metadata
+          # Copy templates and metadata using production-ready promotion script
           python scripts/promote_to_testing.py \
             --source-dir ./qa-templates \
             --target-dir ./testing-repo/testing-templates \
             --qa-results ./reports/qa-gate-evaluation.json
           
-          # Commit and push to Testing
+          # Get QA scores for commit message
+          SECURITY_SCORE=$(jq -r '.security.security_score' reports/qa-gate-evaluation.json)
+          COMPLIANCE_RATE=$(jq -r '.compliance.compliance_pass_rate' reports/qa-gate-evaluation.json)
+          QUALITY_SCORE=$(jq -r '.quality.quality_score' reports/qa-gate-evaluation.json)
+          PERFORMANCE_SCORE=$(jq -r '.performance.performance_score' reports/qa-gate-evaluation.json)
+          TEMPLATE_COUNT=$(find testing-repo/testing-templates/ -name '*.md' | wc -l)
+          
+          # Commit and push to Testing with enhanced metadata
           cd testing-repo
-          git config user.name "DartinBot Pipeline"
-          git config user.email "pipeline@dartinbot.com"
+          git config user.name "DartinBot QA Pipeline"
+          git config user.email "qa-pipeline@dartinbot.com"
           git add .
-          git commit -m "Auto-promote templates from QA [$(date)] - QA validation passed"
+          
+          # Create commit message with QA validation results
+          cat > commit_message.txt << EOF
+          🚀 Auto-promote from QA [$(date)]
+          
+          ✅ QA Validation Complete:
+          - Security Score: ${SECURITY_SCORE}%
+          - Compliance Rate: ${COMPLIANCE_RATE}%
+          - Quality Score: ${QUALITY_SCORE}%
+          - Performance Score: ${PERFORMANCE_SCORE}%
+          
+          🎯 Next Stage: Ultra-Strict Testing (99.9999% accuracy threshold)
+          📊 Template Count: ${TEMPLATE_COUNT}
+          🔒 Security Certified: ✅
+          📋 Compliance Validated: ✅
+          EOF
+          
+          git commit -F commit_message.txt
           git push origin main
           
-          echo "✅ Successfully promoted to Testing stage"
+          echo "✅ Successfully promoted to Testing stage with enhanced metadata"
       
       - name: Create QA promotion report
         if: always()
